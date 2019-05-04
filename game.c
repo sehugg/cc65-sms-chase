@@ -3,10 +3,18 @@
 
 //This game is an example for my article Programming NES games in C
 
-
 //include the library
 
 #include "neslib.h"
+#include <string.h>
+
+//#link "famitone2.s"
+//#link "chase/music.s"
+//#link "chase/sounds.s"
+
+// CHR data
+//#resource "chase/tileset.chr"
+//#link "chase/tileset.s"
 
 //include nametables for all the screens such as title or game over
 
@@ -225,8 +233,8 @@ static unsigned char map[MAP_WDT*MAP_HGT];
 
 //put all the subsequent global vars into zeropage, to make code faster and shorter
 
-#pragma bss-name (push,"ZEROPAGE")
-#pragma data-name (push,"ZEROPAGE")
+#pragma bss-name(push,"ZEROPAGE")
+#pragma data-name(push,"ZEROPAGE")
 
 //set of general purpose global vars that are used everywhere in the program
 //this makes code faster and shorter, although not very convinent and readable
