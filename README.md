@@ -1,4 +1,4 @@
 
 Demo game by Shiru for NES.
 
-Modified by @sehugg to work with http://8bitworkshop.com
+You can open this project in [8bitworkshop](http://8bitworkshop.com/redir.html?platform=nes&githubURL=https://github.com/sehugg/cc65-nes-chase). The main file is [game.c](game.c#mainfile).
