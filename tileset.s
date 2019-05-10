@@ -1,2 +1,2 @@
 .segment "CHARS"
-.incbin "chase/tileset.chr"
+.incbin "tileset.chr"

@@ -9,12 +9,12 @@
 #include <string.h>
 
 //#link "famitone2.s"
-//#link "chase/music.s"
-//#link "chase/sounds.s"
+//#link "music.s"
+//#link "sounds.s"
 
 // CHR data
-//#resource "chase/tileset.chr"
-//#link "chase/tileset.s"
+//#resource "tileset.chr"
+//#link "tileset.s"
 
 //include nametables for all the screens such as title or game over
 
