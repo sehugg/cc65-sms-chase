@@ -12,11 +12,22 @@
 #include "common.h"
 //#link "common.c"
 
+extern const unsigned char TILESET[8192];
+//#link "tileset.c"
+
 #include "data.h"
 //#link "data.c"
+//#resource "title_nam.h"
+//#resource "level_nam.h"
+//#resource "gameover_nam.h"
+//#resource "welldone_nam.h"
+//#resource "level1_nam.h"
+//#resource "level2_nam.h"
+//#resource "level3_nam.h"
+//#resource "level4_nam.h"
+//#resource "level5_nam.h"
 
-#include "PSGLib.h"
-//#link "PSGLib.c"
+// NES compatibility
 
 #define NAMETABLE_A IMAGE
 #define NAMETABLE_C IMAGE
@@ -42,15 +53,38 @@
 #define rand8() (rand() & 0xff)
 #define FALSE 0
 #define TRUE 1
+#define famitone_init(data)
+#define sfx_init(data)
+#define nmi_set_callback(cb)
 
+void vram_put(unsigned char n) {
+  cv_voutb(n);
+  cv_voutb(0); // TODO
+}
 void vram_fill(byte ch, word len) {
-  while (len--) cv_voutb(ch);
+  while (len--) {
+    vram_put(ch);
+  }
 }
-void vram_unrle(const char* rle) {
-  rle; // TODO
+void vram_read(unsigned char *dst, unsigned int size) {
+  dst; size;
 }
-void vram_put(unsigned char n);
-void vram_read(unsigned char *dst, unsigned int size);
+void vram_unrle(const byte* rle) {
+  byte tag = *rle++;
+  byte data = 0;
+  byte count;
+  while (1) {
+    if (*rle == tag) {
+      ++rle;
+      count = *rle++;
+      if (!count) break;
+      vram_fill(data, count);
+    } else {
+      vram_put(data = *rle++);
+    }
+  }
+  rle=rle;
+}
 void set_vram_update(unsigned char *buf) {
   buf; // TODO
 }
@@ -60,12 +94,59 @@ void pal_bg(const char *data) {
 void pal_spr(const char *data) {
   data; // TODO
 }
-unsigned char pad_trigger(unsigned char pad);
-unsigned char pad_state(unsigned char pad);
-void pal_col(unsigned char index, unsigned char color);
-void oam_clear(void);
-void vram_write(const unsigned char *src, unsigned int size);
-unsigned char oam_meta_spr(unsigned char x, unsigned char y, unsigned char sprid, const unsigned char *data);
+unsigned char pad_trigger(unsigned char pad) {
+  pad; return 0;
+}
+unsigned char pad_state(unsigned char pad) {
+  pad; return 0;
+}
+void pal_col(unsigned char index, unsigned char color) {
+  index; color;
+}
+void oam_clear(void) {
+}
+void vram_write(const unsigned char *src, unsigned int size) {
+  src; size;
+}
+unsigned char oam_meta_spr(unsigned char x, unsigned char y,
+                           unsigned char sprid, 
+                           const unsigned char *data) {
+  x;y;sprid;data; ///TODO
+}
+
+/*{pal:222,n:32}*/
+const char PALETTE[32] = {
+  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+  0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0D,
+  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+  0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0D,
+};
+
+void expand_nesbitmap(const char* src, byte ntiles, byte p) {
+  byte i;
+  while (ntiles--) {
+    for (i=0; i<8; i++) {
+      byte b1 = src[0];
+      byte b2 = src[8];
+      cv_voutb(p&0x01?b1:p&0x10?b2:0);
+      cv_voutb(p&0x02?b1:p&0x20?b2:0);
+      cv_voutb(p&0x04?b1:p&0x40?b2:0);
+      cv_voutb(p&0x08?b1:p&0x80?b2:0);
+      src++;
+    }
+    src += 8;
+  }
+}
+
+void setup_graphics() {
+  cv_set_screen_mode(CV_SCREENMODE_4);
+  cv_set_character_pattern_t(PATTERN | 0x3000);
+  cv_set_image_table(IMAGE | 0x400);
+  cv_set_sprite_attribute_table(SPRITES);
+  cv_set_write_vram_address(PATTERN);
+  expand_nesbitmap(TILESET, 255, 0x21);
+  cvu_memtocmemcpy(0xc000, PALETTE, 32);
+}
 
 //game uses 12:4 fixed point calculations for enemy movements
 
@@ -326,21 +407,21 @@ static unsigned char update_list[7*3+1];
 
 void pal_fade_to(unsigned to)
 {
-	if(!to) music_stop();
+  if(!to) music_stop();
 
-	while(bright!=to)
-	{
-		delay(4);
-		if(bright<to) ++bright; else --bright;
-		pal_bright(bright);
-	}
+  while(bright!=to)
+  {
+    delay(4);
+    if(bright<to) ++bright; else --bright;
+    pal_bright(bright);
+  }
 
-	if(!bright)
-	{
-		ppu_off();
-		set_vram_update(NULL);
-		scroll(0,0);
-	}
+  if(!bright)
+  {
+    ppu_off();
+    set_vram_update(NULL);
+    scroll(0,0);
+  }
 }
 
 
@@ -349,64 +430,64 @@ void pal_fade_to(unsigned to)
 
 void title_screen(void)
 {
-	scroll(-8,240);//title is aligned to the color attributes, so shift it a bit to the right
+  scroll(-8,240);//title is aligned to the color attributes, so shift it a bit to the right
 
-	vram_adr(NAMETABLE_A);
-	vram_unrle(title_nam);
+  vram_adr(NAMETABLE_A);
+  vram_unrle(title_nam);
 
-	vram_adr(NAMETABLE_C);//clear second nametable, as it is visible in the jumping effect
-	vram_fill(0,1024);
+  //vram_adr(NAMETABLE_C);//clear second nametable, as it is visible in the jumping effect
+  //vram_fill(0,1024);
 
-	pal_bg(palTitle);
-	pal_bright(4);
-	ppu_on_bg();
-	delay(20);//delay just to make it look better
+  pal_bg(palTitle);
+  pal_bright(4);
+  ppu_on_bg();
+  delay(20);//delay just to make it look better
 
-	iy=240<<FP_BITS;
-	dy=-8<<FP_BITS;
-	frame_cnt=0;
-	wait=160;
-	bright=4;
+  iy=240<<FP_BITS;
+  dy=-8<<FP_BITS;
+  frame_cnt=0;
+  wait=160;
+  bright=4;
 
-	while(1)
-	{
-		ppu_wait_frame();
+  while(1)
+  {
+    ppu_wait_frame();
 
-		scroll(-8,iy>>FP_BITS);
+    scroll(-8,iy>>FP_BITS);
 
-		if(pad_trigger(0)&PAD_START) break;
+    if(pad_trigger(0)&PAD_START) break;
 
-		iy+=dy;
+    iy+=dy;
 
-		if(iy<0)
-		{
-			iy=0;
-			dy=-dy>>1;
-		}
+    if(iy<0)
+    {
+      iy=0;
+      dy=-dy>>1;
+    }
 
-		if(dy>(-8<<FP_BITS)) dy-=2;
+    if(dy>(-8<<FP_BITS)) dy-=2;
 
-		if(wait)
-		{
-			--wait;
-		}
-		else
-		{
-			pal_col(2,(frame_cnt&32)?0x0f:0x20);//blinking press start text
-			++frame_cnt;
-		}
-	}
+    if(wait)
+    {
+      --wait;
+    }
+    else
+    {
+      pal_col(2,(frame_cnt&32)?0x0f:0x20);//blinking press start text
+      ++frame_cnt;
+    }
+  }
 
-	scroll(-8,0);//if start is pressed, show the title at whole
-	sfx_play(SFX_START,0);
+  scroll(-8,0);//if start is pressed, show the title at whole
+  sfx_play(SFX_START,0);
 
-	for(i=0;i<16;++i)//and blink the text faster
-	{
-		pal_col(2,i&1?0x0f:0x20);
-		delay(4);
-	}
+  for(i=0;i<16;++i)//and blink the text faster
+  {
+    pal_col(2,i&1?0x0f:0x20);
+    delay(4);
+  }
 
-	pal_fade_to(0);
+  pal_fade_to(0);
 }
 
 
@@ -415,59 +496,59 @@ void title_screen(void)
 
 void show_screen(unsigned char num)
 {
-	scroll(-4,0); //all the screens are misaligneg horizontally by half of a tile
+  scroll(-4,0); //all the screens are misaligneg horizontally by half of a tile
 
-	if(num<LEVELS_ALL) spr=0; else spr=num-LEVELS_ALL+1;//get offset in the screens list
+  if(num<LEVELS_ALL) spr=0; else spr=num-LEVELS_ALL+1;//get offset in the screens list
 
-	vram_adr(NAMETABLE_A);
-	vram_unrle(screenList[spr]);
+  vram_adr(NAMETABLE_A);
+  vram_unrle(screenList[spr]);
 
-	if(!spr)//if it is the level screen, print large number
-	{
-		j=num<<1;
-		i16=0x2194;//position of the number in the nametable
+  if(!spr)//if it is the level screen, print large number
+  {
+    j=num<<1;
+    i16=0x2194;//position of the number in the nametable
 
-		for(i=0;i<3;++i)
-		{
-			vram_adr(i16);
-			vram_put(largeNums[j]);
-			vram_put(largeNums[j+1]);
-			j+=10;
-			i16+=32;
-		}
-	}
+    for(i=0;i<3;++i)
+    {
+      vram_adr(i16);
+      vram_put(largeNums[j]);
+      vram_put(largeNums[j+1]);
+      j+=10;
+      i16+=32;
+    }
+  }
 
-	i16=(num==SCREEN_GAMEOVER)?0x1525:0x1121;//two colors for flashing text in LSB and MSB
+  i16=(num==SCREEN_GAMEOVER)?0x1525:0x1121;//two colors for flashing text in LSB and MSB
 
-	frame_cnt=0;
+  frame_cnt=0;
 
-	pal_col(2,i16&0xff);//this palette entry is used for flashing text
-	pal_col(3,0x30);
-	pal_col(6,0x30);
-	ppu_on_bg();
+  pal_col(2,i16&0xff);//this palette entry is used for flashing text
+  pal_col(3,0x30);
+  pal_col(6,0x30);
+  ppu_on_bg();
 
-	pal_fade_to(4);
-	music_play(screenMusicList[spr]);
+  pal_fade_to(4);
+  music_play(screenMusicList[spr]);
 
-	if(!spr)//if it is the level screen, just wait one second
-	{
-		delay(50);
-	}
-	else//otherwise wait for Start button and display flashing text
-	{
-		while(1)
-		{
-			ppu_wait_frame();
+  if(!spr)//if it is the level screen, just wait one second
+  {
+    delay(50);
+  }
+  else//otherwise wait for Start button and display flashing text
+  {
+    while(1)
+    {
+      ppu_wait_frame();
 
-			pal_col(2,frame_cnt&2?i16&0xff:i16>>8);
+      pal_col(2,frame_cnt&2?i16&0xff:i16>>8);
 
-			if(pad_trigger(0)&PAD_START) break;
+      if(pad_trigger(0)&PAD_START) break;
 
-			++frame_cnt;
-		}
-	}
+      ++frame_cnt;
+    }
+  }
 
-	pal_fade_to(0);
+  pal_fade_to(0);
 }
 
 
@@ -476,21 +557,21 @@ void show_screen(unsigned char num)
 
 void player_move(unsigned char id,unsigned char dir)
 {
-	px=player_x[id]>>(TILE_SIZE_BIT+FP_BITS);
-	py=player_y[id]>>(TILE_SIZE_BIT+FP_BITS);
+  px=player_x[id]>>(TILE_SIZE_BIT+FP_BITS);
+  py=player_y[id]>>(TILE_SIZE_BIT+FP_BITS);
 
-	switch(dir)
-	{
-	case DIR_LEFT:  --px; break;
-	case DIR_RIGHT: ++px; break;
-	case DIR_UP:    --py; break;
-	case DIR_DOWN:  ++py; break;
-	}
+  switch(dir)
+  {
+    case DIR_LEFT:  --px; break;
+    case DIR_RIGHT: ++px; break;
+    case DIR_UP:    --py; break;
+    case DIR_DOWN:  ++py; break;
+  }
 
-	if(map[MAP_ADR(px,py)]==TILE_WALL) return;
+  if(map[MAP_ADR(px,py)]==TILE_WALL) return;
 
-	player_cnt[id]=TILE_SIZE<<FP_BITS;
-	player_dir[id]=dir;
+  player_cnt[id]=TILE_SIZE<<FP_BITS;
+  player_dir[id]=dir;
 }
 
 
@@ -499,370 +580,383 @@ void player_move(unsigned char id,unsigned char dir)
 
 void put_num(unsigned int adr,unsigned int num,unsigned char len)
 {
-	vram_adr(adr);
+  vram_adr(adr);
 
-	if(len>2) vram_put(0x10+num/100);
-	if(len>1) vram_put(0x10+num/10%10);
-	vram_put(0x10+num%10);
+  if(len>2) vram_put(0x10+num/100);
+  if(len>1) vram_put(0x10+num/10%10);
+  vram_put(0x10+num%10);
 }
 
 
+void rewrite_level_vram() {
+  //this loop reads the level nametable back from VRAM, row by row,
+  //constructs game map, removes spawn points from the nametable,
+  //and writes back to the VRAM
+
+  i16=NAMETABLE_A+0x0080;
+  ptr=0;
+  wait=0;
+
+  for(i=2;i<MAP_HGT+2;++i)
+  {
+    vram_adr(i16);
+    vram_read(nameRow,32);
+    vram_adr(i16);
+
+    for(j=0;j<MAP_WDT<<1;j+=2)
+    {
+      spr=nameRow[j];
+
+      switch(spr)
+      {
+        case TILE_PLAYER://player
+        case TILE_ENEMY1://enemies
+        case TILE_ENEMY2:
+        case TILE_ENEMY3:
+          player_dir  [player_all]=DIR_NONE;
+          player_x    [player_all]=(j<<3)<<FP_BITS;
+          player_y    [player_all]=(i<<4)<<FP_BITS;
+          player_cnt  [player_all]=0;
+          player_wait [player_all]=16+((spr-TILE_PLAYER)<<4);
+          player_speed[player_all]=(spr==TILE_PLAYER)?2<<FP_BITS:10+((spr-TILE_ENEMY1)<<1);
+          ++player_all;
+          wait+=16;
+          spr=TILE_EMPTY;
+          break;
+
+        case TILE_ITEM:
+          ++items_count;
+          break;
+      }
+
+      map[ptr++]=spr;
+
+      vram_put(spr);
+      vram_put(nameRow[j+1]);
+    }
+
+    i16+=64;
+  }
+
+}
+
+void build_oam() {
+
+  spr=(player_all-1)<<4;
+
+  for(i=0;i<player_all;++i)
+  {
+    py=player_y[i]>>FP_BITS;
+
+    if(player_wait[i])
+    {
+      if(player_wait[i]>=16||player_wait[i]&2) py=240;
+    }
+
+    oam_meta_spr(player_x[i]>>FP_BITS,py,spr,sprListPlayer[i]);
+    spr-=16;
+  }
+
+}
+
+void move_player(char i) {
+  if(player_cnt[i])
+  {
+    switch(player_dir[i])
+    {
+      case DIR_RIGHT: player_x[i]+=player_speed[i]; break;
+      case DIR_LEFT:  player_x[i]-=player_speed[i]; break;
+      case DIR_DOWN:  player_y[i]+=player_speed[i]; break;
+      case DIR_UP:    player_y[i]-=player_speed[i]; break;
+    }
+
+    player_cnt[i]-=player_speed[i];
+
+    //if move from one tile to another is over, realign the object to tile grid
+    //it is needed because when it moves with non-integer speed, it could
+    //overrun the destination tile a little bit, and thus can't take a turn properly
+
+    if(player_cnt[i]<=0)
+    {
+      if(player_cnt[i]<0) //overrun
+      {
+        player_cnt[i]=0;
+
+        //0xff is a coordinate mask that leaves only integer tile offeset
+        //it is 8:4:4 here, where 8 is integer tile coordinate,
+        //first 4 is offset in the tile, which is 16 pixels wide,
+        //and second 4 is fixed point resolution
+
+        player_x[i]=(player_x[i]&0xff00)+(player_dir[i]==DIR_LEFT?0x100:0);
+        player_y[i]=(player_y[i]&0xff00)+(player_dir[i]==DIR_UP  ?0x100:0);
+      }
+
+      //it is is the player object, check if there is an item in the new tile
+      if(!i)
+      {
+        i16=MAP_ADR((player_x[i]>>(TILE_SIZE_BIT+FP_BITS)),
+                    (player_y[i]>>(TILE_SIZE_BIT+FP_BITS)));
+
+        if(map[i16]==TILE_ITEM)
+        {
+          map[i16]=TILE_EMPTY; //mark as collected in the game map
+
+          sfx_play(SFX_ITEM,2);
+          ++items_collected;
+
+          //get address of the tile in the nametable
+
+          i16=NAMETABLE_A+0x0080+(((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))-2)<<6)|
+            ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1);
+
+          //replace it with empty tile through the update list
+
+          update_list[0]=i16>>8;
+          update_list[1]=i16&255;
+          update_list[3]=update_list[0];
+          update_list[4]=update_list[1]+1;
+          i16+=32;
+          update_list[6]=i16>>8;
+          update_list[7]=i16&255;
+          update_list[9]=update_list[6];
+          update_list[10]=update_list[7]+1;
+
+          //update number of collected items in the game stats
+
+          update_list[14]=0x10+items_collected/100;
+          update_list[17]=0x10+items_collected/10%10;
+          update_list[20]=0x10+items_collected%10;
+        }
+      }
+    }
+  }
+
+}
 
 //the main gameplay code
 
 void game_loop(void)
 {
-	oam_clear();
+  oam_clear();
 
-	i=game_level<<1;
+  i=game_level<<1;
 
-	vram_adr(NAMETABLE_A);
-	vram_unrle(levelList[i]);					//unpack level nametable
+  vram_adr(NAMETABLE_A);
+  vram_unrle(levelList[i]);					//unpack level nametable
 
-	vram_adr(NAMETABLE_A+0x0042);
-	vram_write((unsigned char*)statsStr,27); 	//add game stats string
+  vram_adr(NAMETABLE_A+0x0042);
+  vram_write((unsigned char*)statsStr,27); 	//add game stats string
 
-	pal_bg(levelList[i+1]); 						//set up background palette
-	pal_spr(palGameSpr); 							//set up sprites palette
+  pal_bg(levelList[i+1]); 						//set up background palette
+  pal_spr(palGameSpr); 							//set up sprites palette
 
-	player_all=0;
-	items_count=0;
-	items_collected=0;
+  player_all=0;
+  items_count=0;
+  items_collected=0;
 
-	//this loop reads the level nametable back from VRAM, row by row,
-	//constructs game map, removes spawn points from the nametable,
-	//and writes back to the VRAM
+  rewrite_level_vram();
 
-	i16=NAMETABLE_A+0x0080;
-	ptr=0;
-	wait=0;
+  //setup update list
 
-	for(i=2;i<MAP_HGT+2;++i)
-	{
-		vram_adr(i16);
-		vram_read(nameRow,32);
-		vram_adr(i16);
+  memcpy(update_list,updateListData,sizeof(updateListData));
 
-		for(j=0;j<MAP_WDT<<1;j+=2)
-		{
-			spr=nameRow[j];
+  set_vram_update(update_list);
 
-			switch(spr)
-			{
-			case TILE_PLAYER://player
-			case TILE_ENEMY1://enemies
-			case TILE_ENEMY2:
-			case TILE_ENEMY3:
-				player_dir  [player_all]=DIR_NONE;
-				player_x    [player_all]=(j<<3)<<FP_BITS;
-				player_y    [player_all]=(i<<4)<<FP_BITS;
-				player_cnt  [player_all]=0;
-				player_wait [player_all]=16+((spr-TILE_PLAYER)<<4);
-				player_speed[player_all]=(spr==TILE_PLAYER)?2<<FP_BITS:10+((spr-TILE_ENEMY1)<<1);
-				++player_all;
-				wait+=16;
-				spr=TILE_EMPTY;
-				break;
+  //put constant game stats numbers, that aren't updated during level
 
-			case TILE_ITEM:
-				++items_count;
-				break;
-			}
+  put_num(NAMETABLE_A+0x0048,game_level+1,1);
+  put_num(NAMETABLE_A+0x0053,items_count,3);
+  put_num(NAMETABLE_A+0x005d,game_lives-1,1);
 
-			map[ptr++]=spr;
+  //enable display
 
-			vram_put(spr);
-			vram_put(nameRow[j+1]);
-		}
+  ppu_on_all();
 
-		i16+=64;
-	}
+  game_done=FALSE;
+  game_paused=FALSE;
+  game_clear=FALSE;
 
-	//setup update list
+  bright=0;
+  frame_cnt=0;
 
-	memcpy(update_list,updateListData,sizeof(updateListData));
+  while(!game_done)
+  {
+    //construct OAM from object parameters
+    build_oam();
 
-	set_vram_update(update_list);
+    //wait for next frame
+    //it is here and not at beginning of the loop because you need
+    //to update OAM for the very first frame, and you also need to do that
+    //right after object parameters were changed, so either OAM update should
+    //be in a function that called before the loop and at the end of the loop,
+    //or wait for NMI should be placed there
+    //otherwise you would have situation update-wait-display, i.e.
+    //one frame delay between action and display of its result
 
-	//put constant game stats numbers, that aren't updated during level
+    ppu_wait_frame();
 
-	put_num(NAMETABLE_A+0x0048,game_level+1,1);
-	put_num(NAMETABLE_A+0x0053,items_count,3);
-	put_num(NAMETABLE_A+0x005d,game_lives-1,1);
+    ++frame_cnt;
 
-	//enable display
+    //slowly fade virtual brightness to needed value,
+    //which is max for gameplay or half for pause
 
-	ppu_on_all();
+    if(!(frame_cnt&3))
+    {
+      if(!game_paused&&bright<4) ++bright;
+      if( game_paused&&bright>2) --bright;
 
-	game_done=FALSE;
-	game_paused=FALSE;
-	game_clear=FALSE;
+      pal_bright(bright);
+    }
 
-	bright=0;
-	frame_cnt=0;
+    //poll the gamepad in the trigger mode
 
-	while(!game_done)
-	{
-		//construct OAM from object parameters
+    i=pad_trigger(0);
 
-		spr=(player_all-1)<<4;
+    //it start was released and then pressed, toggle pause mode
 
-		for(i=0;i<player_all;++i)
-		{
-			py=player_y[i]>>FP_BITS;
+    if(i&PAD_START)
+    {
+      game_paused^=TRUE;
+      music_pause(game_paused);
+    }
 
-			if(player_wait[i])
-			{
-				if(player_wait[i]>=16||player_wait[i]&2) py=240;
-			}
+    //don't process anything in pause mode, just display latest game state
 
-			oam_meta_spr(player_x[i]>>FP_BITS,py,spr,sprListPlayer[i]);
-			spr-=16;
-		}
+    if(game_paused) continue;
 
-		//wait for next frame
-		//it is here and not at beginning of the loop because you need
-		//to update OAM for the very first frame, and you also need to do that
-		//right after object parameters were changed, so either OAM update should
-		//be in a function that called before the loop and at the end of the loop,
-		//or wait for NMI should be placed there
-		//otherwise you would have situation update-wait-display, i.e.
-		//one frame delay between action and display of its result
+    //CHR bank switching animation with different speed for background and sprites
 
-		ppu_wait_frame();
-
-		++frame_cnt;
-
-		//slowly fade virtual brightness to needed value,
-		//which is max for gameplay or half for pause
-
-		if(!(frame_cnt&3))
-		{
-			if(!game_paused&&bright<4) ++bright;
-			if( game_paused&&bright>2) --bright;
-
-			pal_bright(bright);
-		}
-
-		//poll the gamepad in the trigger mode
-
-		i=pad_trigger(0);
-
-		//it start was released and then pressed, toggle pause mode
-
-		if(i&PAD_START)
-		{
-			game_paused^=TRUE;
-			music_pause(game_paused);
-		}
-
-		//don't process anything in pause mode, just display latest game state
-
-		if(game_paused) continue;
-
-		//CHR bank switching animation with different speed for background and sprites
-
-		bank_bg((frame_cnt>>4)&1);
-		bank_spr((frame_cnt>>3)&1);
-
-		//a counter that does not allow objects to move while spawn animation plays
-
-		if(wait)
-		{
-			--wait;
-
-			if(!wait) music_play(MUSIC_GAME);//start the music when all the objects spawned
-		}
-
-		//check for level completion condition
-
-		if(items_collected==items_count)
-		{
-			music_play(MUSIC_CLEAR);
-			game_done=TRUE;
-			game_clear=TRUE;
-		}
-
-		//process all the objects
-		//player and enemies are the same type of object in this game,
-		//to make code simpler and shorter, but generally they need to be
-		//different kind of objects
-
-		for(i=0;i<player_all;++i)
-		{
-			//per-object spawn animation counter, it counts fron N to 16 to 0
-			//needed because objects spawn in sequence, not all at once
-
-			if(player_wait[i])
-			{
-				if(player_wait[i]==16) sfx_play(i?SFX_RESPAWN2:SFX_RESPAWN1,i);
-				--player_wait[i];
-				continue;
-			}
-
-			if(wait) continue; //don't process object movements if spawn animation is running
-
-			//check collision of an enemy object with player object
-			//NOT logic is used here, check http://gendev.spritesmind.net/page-collide.html
-
-			if(i)
-			{
-				if(!((player_x[i]+(4 <<FP_BITS))>=(player_x[0]+(12<<FP_BITS))||
-				     (player_x[i]+(12<<FP_BITS))< (player_x[0]+(4 <<FP_BITS))||
-					 (player_y[i]+(4 <<FP_BITS))>=(player_y[0]+(12<<FP_BITS))||
-					 (player_y[i]+(12<<FP_BITS))< (player_y[0]+(4 <<FP_BITS))))
-				{
-					//if an enemy touch the player, quit the game loop
-
-					if(!game_clear)
-					{
-						music_play(MUSIC_LOSE);
-						game_done=TRUE;
-						break;
-					}
-				}
-			}
-
-			//if movement counter is not zero, process the movement
-
-			if(player_cnt[i])
-			{
-				switch(player_dir[i])
-				{
-				case DIR_RIGHT: player_x[i]+=player_speed[i]; break;
-				case DIR_LEFT:  player_x[i]-=player_speed[i]; break;
-				case DIR_DOWN:  player_y[i]+=player_speed[i]; break;
-				case DIR_UP:    player_y[i]-=player_speed[i]; break;
-				}
-
-				player_cnt[i]-=player_speed[i];
-
-				//if move from one tile to another is over, realign the object to tile grid
-				//it is needed because when it moves with non-integer speed, it could
-				//overrun the destination tile a little bit, and thus can't take a turn properly
-
-				if(player_cnt[i]<=0)
-				{
-					if(player_cnt[i]<0) //overrun
-					{
-						player_cnt[i]=0;
-
-						//0xff is a coordinate mask that leaves only integer tile offeset
-						//it is 8:4:4 here, where 8 is integer tile coordinate,
-						//first 4 is offset in the tile, which is 16 pixels wide,
-						//and second 4 is fixed point resolution
-
-						player_x[i]=(player_x[i]&0xff00)+(player_dir[i]==DIR_LEFT?0x100:0);
-						player_y[i]=(player_y[i]&0xff00)+(player_dir[i]==DIR_UP  ?0x100:0);
-					}
-
-					//it is is the player object, check if there is an item in the new tile
-					if(!i)
-					{
-						i16=MAP_ADR((player_x[i]>>(TILE_SIZE_BIT+FP_BITS)),
-						            (player_y[i]>>(TILE_SIZE_BIT+FP_BITS)));
-
-						if(map[i16]==TILE_ITEM)
-						{
-							map[i16]=TILE_EMPTY; //mark as collected in the game map
-
-							sfx_play(SFX_ITEM,2);
-							++items_collected;
-
-							//get address of the tile in the nametable
-
-							i16=NAMETABLE_A+0x0080+(((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))-2)<<6)|
-							                        ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1);
-
-							//replace it with empty tile through the update list
-
-							update_list[0]=i16>>8;
-							update_list[1]=i16&255;
-							update_list[3]=update_list[0];
-							update_list[4]=update_list[1]+1;
-							i16+=32;
-							update_list[6]=i16>>8;
-							update_list[7]=i16&255;
-							update_list[9]=update_list[6];
-							update_list[10]=update_list[7]+1;
-
-							//update number of collected items in the game stats
-
-							update_list[14]=0x10+items_collected/100;
-							update_list[17]=0x10+items_collected/10%10;
-							update_list[20]=0x10+items_collected%10;
-						}
-					}
-				}
-			}
-
-			if(!player_cnt[i]) //movement to the next tile is done, set up new movement
-			{
-				if(!i) //this is the player, process controls
-				{
-					//get gamepad state, it was previously polled with pad_trigger
-
-					j=pad_state(0);
-
-					//this is a tricky part to make controls more predictable
-					//when you press two directions at once, sliding by a wall
-					//to take turn into a passage on the side
-					//this piece of code gives current direction lower priority
-					//through testing it first
-					//bits in player_dir var are matching to the buttons bits
-
-					if(j&player_dir[0])
-					{
-						j&=~player_dir[0]; //remove the direction from further check
-						player_move(i,player_dir[0]); //change the direction
-					}
-
-					//now continue control processing as usual
-
-					if(j&PAD_LEFT)  player_move(i,DIR_LEFT);
-					if(j&PAD_RIGHT) player_move(i,DIR_RIGHT);
-					if(j&PAD_UP)    player_move(i,DIR_UP);
-					if(j&PAD_DOWN)  player_move(i,DIR_DOWN);
-				}
-				else //this is an enemy, run AI
-				{
-					//the AI is very simple
-					//first we create list of all directions that are possible to take
-					//excluding the direction that is opposite to previous one
-
-					i16=MAP_ADR((player_x[i]>>8),(player_y[i]>>8));
-					ptr=player_dir[i];
-					j=0;
-
-					if(ptr!=DIR_RIGHT&&map[i16-1]!=TILE_WALL) dir[j++]=DIR_LEFT;
-					if(ptr!=DIR_LEFT &&map[i16+1]!=TILE_WALL) dir[j++]=DIR_RIGHT;
-					if(ptr!=DIR_DOWN &&map[i16-MAP_WDT]!=TILE_WALL) dir[j++]=DIR_UP;
-					if(ptr!=DIR_UP   &&map[i16+MAP_WDT]!=TILE_WALL) dir[j++]=DIR_DOWN;
-
-					//randomly select a possible direction
-
-					player_move(i,dir[rand8()%j]);
-
-					//if there was more than one possible direction,
-					//i.e. it is a branch and not a corridor,
-					//attempt to move towards the player
-
-					if(j>1)
-					{
-						if(ptr!=DIR_DOWN &&player_y[0]<player_y[i]) player_move(i,DIR_UP);
-						if(ptr!=DIR_UP   &&player_y[0]>player_y[i]) player_move(i,DIR_DOWN);
-						if(ptr!=DIR_RIGHT&&player_x[0]<player_x[i]) player_move(i,DIR_LEFT);
-						if(ptr!=DIR_LEFT &&player_x[0]>player_x[i]) player_move(i,DIR_RIGHT);
-					}
-				}
-			}
-		}
-	}
-
-	delay(100);
-	pal_fade_to(0);
+    bank_bg((frame_cnt>>4)&1);
+    bank_spr((frame_cnt>>3)&1);
+
+    //a counter that does not allow objects to move while spawn animation plays
+
+    if(wait)
+    {
+      --wait;
+
+      if(!wait) music_play(MUSIC_GAME);//start the music when all the objects spawned
+    }
+
+    //check for level completion condition
+
+    if(items_collected==items_count)
+    {
+      music_play(MUSIC_CLEAR);
+      game_done=TRUE;
+      game_clear=TRUE;
+    }
+
+    //process all the objects
+    //player and enemies are the same type of object in this game,
+    //to make code simpler and shorter, but generally they need to be
+    //different kind of objects
+
+    for(i=0;i<player_all;++i)
+    {
+      //per-object spawn animation counter, it counts fron N to 16 to 0
+      //needed because objects spawn in sequence, not all at once
+
+      if(player_wait[i])
+      {
+        if(player_wait[i]==16) sfx_play(i?SFX_RESPAWN2:SFX_RESPAWN1,i);
+        --player_wait[i];
+        continue;
+      }
+
+      if(wait) continue; //don't process object movements if spawn animation is running
+
+      //check collision of an enemy object with player object
+      //NOT logic is used here, check http://gendev.spritesmind.net/page-collide.html
+
+      if(i)
+      {
+        if(!((player_x[i]+(4 <<FP_BITS))>=(player_x[0]+(12<<FP_BITS))||
+             (player_x[i]+(12<<FP_BITS))< (player_x[0]+(4 <<FP_BITS))||
+             (player_y[i]+(4 <<FP_BITS))>=(player_y[0]+(12<<FP_BITS))||
+             (player_y[i]+(12<<FP_BITS))< (player_y[0]+(4 <<FP_BITS))))
+        {
+          //if an enemy touch the player, quit the game loop
+
+          if(!game_clear)
+          {
+            music_play(MUSIC_LOSE);
+            game_done=TRUE;
+            break;
+          }
+        }
+      }
+
+      move_player(i);
+
+      //if movement counter is not zero, process the movement
+
+      if(!player_cnt[i]) //movement to the next tile is done, set up new movement
+      {
+        if(!i) //this is the player, process controls
+        {
+          //get gamepad state, it was previously polled with pad_trigger
+
+          j=pad_state(0);
+
+          //this is a tricky part to make controls more predictable
+          //when you press two directions at once, sliding by a wall
+          //to take turn into a passage on the side
+          //this piece of code gives current direction lower priority
+          //through testing it first
+          //bits in player_dir var are matching to the buttons bits
+
+          if(j&player_dir[0])
+          {
+            j&=~player_dir[0]; //remove the direction from further check
+            player_move(i,player_dir[0]); //change the direction
+          }
+
+          //now continue control processing as usual
+
+          if(j&PAD_LEFT)  player_move(i,DIR_LEFT);
+          if(j&PAD_RIGHT) player_move(i,DIR_RIGHT);
+          if(j&PAD_UP)    player_move(i,DIR_UP);
+          if(j&PAD_DOWN)  player_move(i,DIR_DOWN);
+        }
+        else //this is an enemy, run AI
+        {
+          //the AI is very simple
+          //first we create list of all directions that are possible to take
+          //excluding the direction that is opposite to previous one
+
+          i16=MAP_ADR((player_x[i]>>8),(player_y[i]>>8));
+          ptr=player_dir[i];
+          j=0;
+
+          if(ptr!=DIR_RIGHT&&map[i16-1]!=TILE_WALL) dir[j++]=DIR_LEFT;
+          if(ptr!=DIR_LEFT &&map[i16+1]!=TILE_WALL) dir[j++]=DIR_RIGHT;
+          if(ptr!=DIR_DOWN &&map[i16-MAP_WDT]!=TILE_WALL) dir[j++]=DIR_UP;
+          if(ptr!=DIR_UP   &&map[i16+MAP_WDT]!=TILE_WALL) dir[j++]=DIR_DOWN;
+
+          //randomly select a possible direction
+
+          player_move(i,dir[rand8()%j]);
+
+          //if there was more than one possible direction,
+          //i.e. it is a branch and not a corridor,
+          //attempt to move towards the player
+
+          if(j>1)
+          {
+            if(ptr!=DIR_DOWN &&player_y[0]<player_y[i]) player_move(i,DIR_UP);
+            if(ptr!=DIR_UP   &&player_y[0]>player_y[i]) player_move(i,DIR_DOWN);
+            if(ptr!=DIR_RIGHT&&player_x[0]<player_x[i]) player_move(i,DIR_LEFT);
+            if(ptr!=DIR_LEFT &&player_x[0]>player_x[i]) player_move(i,DIR_RIGHT);
+          }
+        }
+      }
+    }
+  }
+
+  delay(100);
+  pal_fade_to(0);
 }
-
 
 
 //this is where the program starts
@@ -871,26 +965,27 @@ extern const void music_data[];
 
 void main(void)
 {
-  	famitone_init(&music_data);
-	sfx_init(&sound_data);
-	nmi_set_callback(famitone_update);
-  
-	while(1)//infinite loop, title-gameplay
-	{
-		title_screen();
+  setup_graphics();
+  famitone_init(&music_data);
+  sfx_init(&sound_data);
+  nmi_set_callback(famitone_update);
 
-		game_level=0;
-		game_lives=4;
+  while(1)//infinite loop, title-gameplay
+  {
+    title_screen();
 
-		while(game_lives&&game_level<LEVELS_ALL)//loop for gameplay
-		{
-			show_screen(game_level);
+    game_level=0;
+    game_lives=4;
 
-			game_loop();
+    while(game_lives&&game_level<LEVELS_ALL)//loop for gameplay
+    {
+      show_screen(game_level);
 
-			if(game_clear) ++game_level; else --game_lives;
-		}
+      game_loop();
 
-		show_screen(!game_lives?SCREEN_GAMEOVER:SCREEN_WELLDONE);//show game results
-	}
+      if(game_clear) ++game_level; else --game_lives;
+    }
+
+    show_screen(!game_lives?SCREEN_GAMEOVER:SCREEN_WELLDONE);//show game results
+  }
 }
