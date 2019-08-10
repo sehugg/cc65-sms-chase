@@ -1,9 +1,9 @@
+
 //Chase NES game by Shiru (shiru@mail.ru) 01'12
 //Feel free to do anything you want with this code, consider it Public Domain
-
 //This game is an example for my article Programming NES games in C
+//Ported to SMS for 8bitworkshop by @sehugg 08'19
 
-//include the library
 #include <cv.h>
 #include <cvu.h>
 #include <string.h>
@@ -12,8 +12,15 @@
 #include "common.h"
 //#link "common.c"
 
+#include "PSGlib.h"
+//#link "PSGlib.c"
+
+///// pattern table data
+
 extern const unsigned char TILESET[8192];
 //#link "tileset.c"
+
+///// nametable data
 
 #include "data.h"
 //#link "data.c"
@@ -27,7 +34,13 @@ extern const unsigned char TILESET[8192];
 //#resource "level4_nam.h"
 //#resource "level5_nam.h"
 
-// NES compatibility
+///// music and SFX
+
+//#link "musicdata.c"
+extern unsigned char MUSIC_TITLE[0];
+extern unsigned char SFX_START[0];
+
+///// NES compatibility macros
 
 #define NAMETABLE_A IMAGE
 #define NAMETABLE_C IMAGE
@@ -176,7 +189,8 @@ void expand_nesbitmap(const char* src, int ntiles, byte p) {
 
 void vblank_handler(void) {
   flush_vram_update();
-  // TODO
+  PSGFrame();
+  //PSGSFXFrame();
 }
 
 void setup_graphics() {
@@ -493,7 +507,7 @@ void title_screen(void)
   pal_bright(4);
   ppu_on_bg();
   delay(20);//delay just to make it look better
-
+  
   iy=240<<FP_BITS;
   dy=-8<<FP_BITS;
   frame_cnt=0;
@@ -530,7 +544,6 @@ void title_screen(void)
   }
 
   scroll(-8,0);//if start is pressed, show the title at whole
-  sfx_play(SFX_START,0);
 
   for(i=0;i<16;++i)//and blink the text faster
   {
@@ -548,6 +561,8 @@ void title_screen(void)
 void show_screen(unsigned char num)
 {
   byte i,j;
+
+  PSGPlayNoRepeat(MUSIC_TITLE);
   
   scroll(-4,0); //all the screens are misaligneg horizontally by half of a tile
 
@@ -581,11 +596,11 @@ void show_screen(unsigned char num)
   ppu_on_bg();
 
   pal_fade_to(4);
-  music_play(screenMusicList[spr]);
+  //music_play(screenMusicList[spr]);
 
   if(!spr)//if it is the level screen, just wait one second
   {
-    delay(50);
+    delay(100);
   }
   else//otherwise wait for Start button and display flashing text
   {
@@ -1047,9 +1062,6 @@ extern const void music_data[];
 void main(void)
 {
   setup_graphics();
-  famitone_init(&music_data);
-  sfx_init(&sound_data);
-  nmi_set_callback(famitone_update);
 
   while(1)//infinite loop, title-gameplay
   {
