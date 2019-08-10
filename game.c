@@ -90,9 +90,6 @@ void vram_unrle(const byte* rle) {
   }
   rle=rle;
 }
-void set_vram_update(unsigned char *buf) {
-  buf; // TODO
-}
 void pal_bg(const char *data) {
   data; // TODO
 }
@@ -114,16 +111,31 @@ void oam_clear(void) {
 }
 unsigned char oam_meta_spr(unsigned char x, unsigned char y,
                            unsigned char sprid, 
-                           const signed char *data) {
+                           const unsigned char *data) {
   struct cvu_sprite4 spr;
-  while (*data != -128) {
-    spr.x = x + *data++;
-    spr.y = y + *data++;
+  while (*data != 128) {
+    spr.x = x + (sbyte)*data++;
+    spr.y = y + (sbyte)*data++;
     spr.name = *data++;
     *data++; // skip attr?
     cvu_set_sprite4(SPRITES, sprid++, &spr);
   }
   return sprid;
+}
+
+static unsigned char* update_ptr = NULL;
+
+void set_vram_update(unsigned char *buf) {
+  update_ptr = buf;
+}
+void flush_vram_update() {
+  unsigned char* buf = update_ptr;
+  if (!buf) return;
+  /*
+  while (*buf != NT_UPD_EOF) {
+    // TODO
+  }
+  */
 }
 
 /*{pal:222,n:64}*/
@@ -162,6 +174,11 @@ void convert_nespalette(word cram, const char* nespal, byte count) {
   }
 }
 
+void vblank_handler(void) {
+  flush_vram_update();
+  // TODO
+}
+
 void setup_graphics() {
   cv_set_screen_mode(CV_SCREENMODE_4);
   cv_set_character_pattern_t(PATTERN | 0x3000);
@@ -171,6 +188,7 @@ void setup_graphics() {
   expand_nesbitmap(TILESET, 255, 0x21);
   //convert_nespalette(0xc000, DEF_NES_PALETTE, 32);
   cvu_memtocmemcpy(0xc000, DEF_NES_PALETTE, 32);
+  cv_set_vint_handler(vblank_handler);
 }
 
 //game uses 12:4 fixed point calculations for enemy movements
@@ -730,8 +748,10 @@ void move_player(char i) {
 
           //get address of the tile in the nametable
 
-          i16=NAMETABLE_A+0x0080+(((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))-2)<<6)|
-            ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1);
+          i16 = NTADR(
+            ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1),
+            ((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))<<1)
+           );
 
           //replace it with empty tile through the update list
 
@@ -739,7 +759,7 @@ void move_player(char i) {
           update_list[1]=i16&255;
           update_list[3]=update_list[0];
           update_list[4]=update_list[1]+1;
-          i16+=32;
+          i16+=BYTES_PER_ROW;
           update_list[6]=i16>>8;
           update_list[7]=i16&255;
           update_list[9]=update_list[6];
@@ -768,7 +788,7 @@ void game_loop(void)
   vram_adr(NAMETABLE_A);
   vram_unrle(levelList[i]);					//unpack level nametable
 
-  vram_adr(NAMETABLE_A+0x0042);
+  vram_adr(NTADR(2,2));
   vram_write((unsigned char*)statsStr,27); 	//add game stats string
 
   pal_bg(levelList[i+1]); 						//set up background palette
