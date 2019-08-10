@@ -94,11 +94,13 @@ void pal_bg(const char *data) {
 void pal_spr(const char *data) {
   data; // TODO
 }
-unsigned char pad_trigger(unsigned char pad) {
-  pad; return 0;
-}
 unsigned char pad_state(unsigned char pad) {
-  pad; return 0;
+  struct cv_controller_state state;
+  cv_get_controller_state(&state, pad);
+  return state.joystick;
+}
+unsigned char pad_trigger(unsigned char pad) {
+  return pad_state(pad);
 }
 void pal_col(unsigned char index, unsigned char color) {
   index; color;
@@ -114,8 +116,13 @@ unsigned char oam_meta_spr(unsigned char x, unsigned char y,
   x;y;sprid;data; ///TODO
 }
 
+/*{pal:222,n:64}*/
+const char NES_SMS_PALETTE[64] = {
+0x15, 0x20, 0x20, 0x20, 0x11, 0x01, 0x01, 0x01, 0x00, 0x04, 0x04, 0x04, 0x10, 0x00, 0x00, 0x00, 0x3f, 0x34, 0x30, 0x35, 0x32, 0x13, 0x02, 0x06, 0x05, 0x08, 0x08, 0x08, 0x24, 0x00, 0x00, 0x00, 0x3f, 0x38, 0x36, 0x37, 0x37, 0x37, 0x17, 0x0b, 0x0f, 0x0d, 0x0c, 0x18, 0x3c, 0x15, 0x00, 0x00, 0x3f, 0x3e, 0x3a, 0x3b, 0x3b, 0x3f, 0x3f, 0x2f, 0x2f, 0x2f, 0x2e, 0x3e, 0x3e, 0x3f, 0x00, 0x00,
+};
+
 /*{pal:222,n:32}*/
-const char PALETTE[32] = {
+const char DEF_NES_PALETTE[32] = {
   0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
   0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0D,
   0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -138,6 +145,13 @@ void expand_nesbitmap(const char* src, byte ntiles, byte p) {
   }
 }
 
+void convert_nespalette(word cram, const char* nespal, byte count) {
+  while (count--) {
+    byte smspal = NES_SMS_PALETTE[*nespal++ & 63];
+    cvu_memtocmemcpy(cram++, &smspal, 1);
+  }
+}
+
 void setup_graphics() {
   cv_set_screen_mode(CV_SCREENMODE_4);
   cv_set_character_pattern_t(PATTERN | 0x3000);
@@ -145,7 +159,8 @@ void setup_graphics() {
   cv_set_sprite_attribute_table(SPRITES);
   cv_set_write_vram_address(PATTERN);
   expand_nesbitmap(TILESET, 255, 0x21);
-  cvu_memtocmemcpy(0xc000, PALETTE, 32);
+  //convert_nespalette(0xc000, DEF_NES_PALETTE, 32);
+  cvu_memtocmemcpy(0xc000, DEF_NES_PALETTE, 32);
 }
 
 //game uses 12:4 fixed point calculations for enemy movements
