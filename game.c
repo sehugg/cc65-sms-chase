@@ -115,7 +115,7 @@ unsigned char oam_meta_spr(unsigned char x, unsigned char y,
   return sprid;
 }
 
-static unsigned char* update_ptr = NULL;
+unsigned char* update_ptr = NULL;
 
 void set_vram_update(unsigned char *buf) {
   update_ptr = buf;
@@ -388,64 +388,64 @@ const unsigned char largeNums[10*3]={
 
 //array for game map, contains walls, empty spaces, and items
 
-static unsigned char map[MAP_WDT*MAP_HGT];
+unsigned char map[MAP_WDT*MAP_HGT];
 
 
 //set of general purpose global vars that are used everywhere in the program
 //this makes code faster and shorter, although not very convinent and readable
 
-static unsigned char i,j;
-static unsigned char ptr,spr;
-static unsigned char px,py;
-static unsigned char wait;
-static unsigned int i16;
-static int iy,dy;
+unsigned char i,j;
+unsigned char ptr,spr;
+unsigned char px,py;
+unsigned char wait;
+unsigned int i16;
+int iy,dy;
 
 //this array is used to determine movement directions for enemies
 
-static unsigned char dir[4];
+unsigned char dir[4];
 
 //this array is used to convert nametable into game map, row by row
 
-static unsigned char nameRow[BYTES_PER_ROW];
+unsigned char nameRow[BYTES_PER_ROW];
 
 //number of moving characters on current level
 
-static unsigned char player_all;
+unsigned char player_all;
 
 //character variables
 
-static unsigned int  player_x    [PLAYER_MAX];
-static unsigned int  player_y    [PLAYER_MAX];
-static unsigned char player_dir  [PLAYER_MAX];
-static int           player_cnt  [PLAYER_MAX];
-static unsigned int  player_speed[PLAYER_MAX];
-static unsigned char player_wait [PLAYER_MAX];
+unsigned int  player_x    [PLAYER_MAX];
+unsigned int  player_y    [PLAYER_MAX];
+unsigned char player_dir  [PLAYER_MAX];
+int           player_cnt  [PLAYER_MAX];
+unsigned int  player_speed[PLAYER_MAX];
+unsigned char player_wait [PLAYER_MAX];
 
 //number of items on current level, total and collected
 
-static unsigned char items_count;
-static unsigned char items_collected;
+unsigned char items_count;
+unsigned char items_collected;
 
 //game state variables
 
-static unsigned char game_level;
-static unsigned char game_lives;
+unsigned char game_level;
+unsigned char game_lives;
 
 //game state flags, they are 0 or 1
 
-static unsigned char game_done;
-static unsigned char game_paused;
-static unsigned char game_clear;
+unsigned char game_done;
+unsigned char game_paused;
+unsigned char game_clear;
 
 //system vars used everywhere as well
 
-static unsigned char frame_cnt;
-static unsigned char bright;
+unsigned char frame_cnt;
+unsigned char bright;
 
 //update list
 
-static unsigned char update_list[7*3+1];
+unsigned char update_list[7*3+1];
 
 
 
