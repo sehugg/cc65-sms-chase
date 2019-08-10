@@ -43,7 +43,7 @@ extern const unsigned char TILESET[8192];
 #define sfx_play(i,j)
 #define pal_bright(x)
 #define ppu_off() cv_set_screen_active(false);
-#define ppu_on_bg() cv_set_screen_active(true);
+#define ppu_on_bg() cv_set_screen_active(true); oam_clear()
 #define ppu_on_all() cv_set_screen_active(true);
 #define NT_UPD_EOF 0xff
 #define PAD_START CV_FIRE_0
@@ -108,6 +108,7 @@ void pal_col(unsigned char index, unsigned char color) {
   index; color;
 }
 void oam_clear(void) {
+  cvu_vmemset(SPRITES, 240, 64);
 }
 unsigned char oam_meta_spr(unsigned char x, unsigned char y,
                            unsigned char sprid, 
@@ -131,11 +132,13 @@ void set_vram_update(unsigned char *buf) {
 void flush_vram_update() {
   unsigned char* buf = update_ptr;
   if (!buf) return;
-  /*
   while (*buf != NT_UPD_EOF) {
-    // TODO
+    byte hi = *buf++;
+    byte lo = *buf++;
+    byte data = *buf++;
+    vram_adr(lo + hi*256);
+    vram_put(data);
   }
-  */
 }
 
 /*{pal:222,n:64}*/
@@ -145,9 +148,9 @@ const char NES_SMS_PALETTE[64] = {
 
 /*{pal:222,n:32}*/
 const char DEF_NES_PALETTE[32] = {
-  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+  0x00, 0x34, 0x3C, 0x3F, 0x05, 0x06, 0x07, 0x08,
   0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0D,
-  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+  0x01, 0x02, 0x0B, 0x0F, 0x05, 0x06, 0x07, 0x08,
   0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x0D,
 };
 
@@ -750,7 +753,7 @@ void move_player(char i) {
 
           i16 = NTADR(
             ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1),
-            ((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))<<1)
+            ((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))<<1)-4
            );
 
           //replace it with empty tile through the update list
@@ -758,12 +761,12 @@ void move_player(char i) {
           update_list[0]=i16>>8;
           update_list[1]=i16&255;
           update_list[3]=update_list[0];
-          update_list[4]=update_list[1]+1;
+          update_list[4]=update_list[1]+2;
           i16+=BYTES_PER_ROW;
           update_list[6]=i16>>8;
           update_list[7]=i16&255;
           update_list[9]=update_list[6];
-          update_list[10]=update_list[7]+1;
+          update_list[10]=update_list[7]+2;
 
           //update number of collected items in the game stats
 
@@ -808,9 +811,9 @@ void game_loop(void)
 
   //put constant game stats numbers, that aren't updated during level
 
-  put_num(NAMETABLE_A+0x0048,game_level+1,1);
-  put_num(NAMETABLE_A+0x0053,items_count,3);
-  put_num(NAMETABLE_A+0x005d,game_lives-1,1);
+  put_num(NTADR(8,2),game_level+1,1);
+  put_num(NTADR(19,2),items_count,3);
+  put_num(NTADR(29,2),game_lives-1,1);
 
   //enable display
 
