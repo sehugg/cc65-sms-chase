@@ -49,7 +49,7 @@ extern unsigned char SFX_START[0];
 #define NTADR(x,y) ((y)*BYTES_PER_ROW + (x)*BYTES_PER_CELL + IMAGE)
 #define vram_adr(a) cv_set_write_vram_address(a)
 #define ppu_wait_frame() wait_vsync()
-#define scroll(x,y) //cv_set_hscroll(x); cv_set_vscroll(y);
+#define scroll(x,y) cv_set_hscroll(x); cv_set_vscroll(y);
 #define music_play(i)
 #define music_stop()
 #define music_pause(b)
@@ -462,6 +462,8 @@ unsigned char bright;
 
 unsigned char update_list[7*3+1];
 
+// current scroll offset
+unsigned char scroll_y;
 
 
 //smoothly fade current bright to the given value
@@ -495,7 +497,7 @@ void title_screen(void)
 {
   byte i;
   
-  scroll(-8,240);//title is aligned to the color attributes, so shift it a bit to the right
+  scroll(0,240);
 
   vram_adr(NAMETABLE_A);
   vram_unrle(title_nam);
@@ -518,7 +520,7 @@ void title_screen(void)
   {
     ppu_wait_frame();
 
-    scroll(-8,iy>>FP_BITS);
+    scroll(0,(iy>>FP_BITS)+16);
 
     if(pad_trigger(0)&PAD_START) break;
 
@@ -543,7 +545,7 @@ void title_screen(void)
     }
   }
 
-  scroll(-8,0);//if start is pressed, show the title at whole
+  scroll(0,16);//if start is pressed, show the title at whole
 
   for(i=0;i<16;++i)//and blink the text faster
   {
@@ -564,7 +566,7 @@ void show_screen(unsigned char num)
 
   PSGPlayNoRepeat(MUSIC_TITLE);
   
-  scroll(-4,0); //all the screens are misaligneg horizontally by half of a tile
+  scroll(0,0);
 
   if(num<LEVELS_ALL) spr=0; else spr=num-LEVELS_ALL+1;//get offset in the screens list
 
@@ -716,7 +718,7 @@ void build_oam() {
 
   for(i=0;i<player_all;++i)
   {
-    py=player_y[i]>>FP_BITS;
+    py=(player_y[i]>>FP_BITS) - scroll_y;
 
     if(player_wait[i])
     {
@@ -921,11 +923,28 @@ void setup_level(void) {
 
 }
 
+void scroll_with_player() {
+  sbyte y;
+  // see if the level is large vertically
+  if (map[0xa8] == TILE_WALL || map[0xb8] == TILE_WALL) {
+    y = (player_y[0] >> 5) - 32;
+    if (y < 0) y = 0;
+    if (y > 0x28) y = 0x28;
+  } else {
+    y = 0;
+  }
+  // scroll Y direction if needed
+  cv_set_vscroll(y);
+  scroll_y = y;
+}
+
 void game_loop(void)
 {
   unsigned char i;
   
   setup_level();
+  
+  scroll_with_player(); // reset scrolling
   
   while(!game_done)
   {
@@ -1030,6 +1049,8 @@ void game_loop(void)
             break;
           }
         }
+      } else {
+        scroll_with_player();
       }
 
       move_player(i);
@@ -1056,8 +1077,6 @@ void game_loop(void)
 
 
 //this is where the program starts
-extern const void sound_data[];
-extern const void music_data[];
 
 void main(void)
 {
