@@ -7,24 +7,65 @@
 #include <cv.h>
 #include <cvu.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "common.h"
 //#link "common.c"
 
-//include nametables for all the screens such as title or game over
+#include "data.h"
+//#link "data.c"
 
-#include "title_nam.h"
-#include "level_nam.h"
-#include "gameover_nam.h"
-#include "welldone_nam.h"
+#include "PSGLib.h"
+//#link "PSGLib.c"
 
-//include nametables for levels
+#define NAMETABLE_A IMAGE
+#define NAMETABLE_C IMAGE
+#define vram_adr(a) cv_set_write_vram_address(a)
+#define ppu_wait_frame() wait_vsync()
+#define scroll(x,y)
+#define music_play(i)
+#define music_stop()
+#define music_pause(b)
+#define sfx_play(i,j)
+#define pal_bright(x)
+#define ppu_off() cv_set_screen_active(false);
+#define ppu_on_bg() cv_set_screen_active(true);
+#define ppu_on_all() cv_set_screen_active(true);
+#define NT_UPD_EOF 0xff
+#define PAD_START CV_FIRE_0
+#define PAD_LEFT CV_LEFT
+#define PAD_RIGHT CV_RIGHT
+#define PAD_UP CV_UP
+#define PAD_DOWN CV_DOWN
+#define bank_bg(b)
+#define bank_spr(b)
+#define rand8() (rand() & 0xff)
+#define FALSE 0
+#define TRUE 1
 
-#include "level1_nam.h"
-#include "level2_nam.h"
-#include "level3_nam.h"
-#include "level4_nam.h"
-#include "level5_nam.h"
+void vram_fill(byte ch, word len) {
+  while (len--) cv_voutb(ch);
+}
+void vram_unrle(const char* rle) {
+  rle; // TODO
+}
+void vram_put(unsigned char n);
+void vram_read(unsigned char *dst, unsigned int size);
+void set_vram_update(unsigned char *buf) {
+  buf; // TODO
+}
+void pal_bg(const char *data) {
+  data; // TODO
+}
+void pal_spr(const char *data) {
+  data; // TODO
+}
+unsigned char pad_trigger(unsigned char pad);
+unsigned char pad_state(unsigned char pad);
+void pal_col(unsigned char index, unsigned char color);
+void oam_clear(void);
+void vram_write(const unsigned char *src, unsigned int size);
+unsigned char oam_meta_spr(unsigned char x, unsigned char y, unsigned char sprid, const unsigned char *data);
 
 //game uses 12:4 fixed point calculations for enemy movements
 
