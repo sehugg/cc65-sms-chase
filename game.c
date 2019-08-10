@@ -390,11 +390,8 @@ const unsigned char largeNums[10*3]={
 
 unsigned char map[MAP_WDT*MAP_HGT];
 
+//global variables (TODO: convert to local?)
 
-//set of general purpose global vars that are used everywhere in the program
-//this makes code faster and shorter, although not very convinent and readable
-
-unsigned char i,j;
 unsigned char ptr,spr;
 unsigned char px,py;
 unsigned char wait;
@@ -478,6 +475,8 @@ void pal_fade_to(unsigned to)
 
 void title_screen(void)
 {
+  byte i;
+  
   scroll(-8,240);//title is aligned to the color attributes, so shift it a bit to the right
 
   vram_adr(NAMETABLE_A);
@@ -544,6 +543,8 @@ void title_screen(void)
 
 void show_screen(unsigned char num)
 {
+  byte i,j;
+  
   scroll(-4,0); //all the screens are misaligneg horizontally by half of a tile
 
   if(num<LEVELS_ALL) spr=0; else spr=num-LEVELS_ALL+1;//get offset in the screens list
@@ -637,6 +638,8 @@ void put_num(unsigned int adr,unsigned int num,unsigned char len)
 
 
 void rewrite_level_vram() {
+  byte i,j;
+  
   //this loop reads the level nametable back from VRAM, row by row,
   //constructs game map, removes spawn points from the nametable,
   //and writes back to the VRAM
@@ -688,6 +691,7 @@ void rewrite_level_vram() {
 }
 
 void build_oam() {
+  byte i;
 
   spr=(player_all-1)<<4;
 
@@ -782,13 +786,81 @@ void move_player(char i) {
 
 }
 
+bool enemy_collides_with_player(byte i) {
+  return !((player_x[i]+(4 <<FP_BITS))>=(player_x[0]+(12<<FP_BITS))||
+           (player_x[i]+(12<<FP_BITS))< (player_x[0]+(4 <<FP_BITS))||
+           (player_y[i]+(4 <<FP_BITS))>=(player_y[0]+(12<<FP_BITS))||
+           (player_y[i]+(12<<FP_BITS))< (player_y[0]+(4 <<FP_BITS)));
+}
+
+void process_player_controls(byte i) {
+  byte j;
+  //get gamepad state, it was previously polled with pad_trigger
+
+  j=pad_state(0);
+
+  //this is a tricky part to make controls more predictable
+  //when you press two directions at once, sliding by a wall
+  //to take turn into a passage on the side
+  //this piece of code gives current direction lower priority
+  //through testing it first
+  //bits in player_dir var are matching to the buttons bits
+
+  if(j&player_dir[0])
+  {
+    j&=~player_dir[0]; //remove the direction from further check
+    player_move(i,player_dir[0]); //change the direction
+  }
+
+  //now continue control processing as usual
+
+  if(j&PAD_LEFT)  player_move(i,DIR_LEFT);
+  if(j&PAD_RIGHT) player_move(i,DIR_RIGHT);
+  if(j&PAD_UP)    player_move(i,DIR_UP);
+  if(j&PAD_DOWN)  player_move(i,DIR_DOWN);
+}
+
+void process_enemy(byte i) {
+  byte j;
+  
+  //the AI is very simple
+  //first we create list of all directions that are possible to take
+  //excluding the direction that is opposite to previous one
+
+  i16=MAP_ADR((player_x[i]>>8),(player_y[i]>>8));
+  ptr=player_dir[i];
+  j=0;
+
+  if(ptr!=DIR_RIGHT&&map[i16-1]!=TILE_WALL) dir[j++]=DIR_LEFT;
+  if(ptr!=DIR_LEFT &&map[i16+1]!=TILE_WALL) dir[j++]=DIR_RIGHT;
+  if(ptr!=DIR_DOWN &&map[i16-MAP_WDT]!=TILE_WALL) dir[j++]=DIR_UP;
+  if(ptr!=DIR_UP   &&map[i16+MAP_WDT]!=TILE_WALL) dir[j++]=DIR_DOWN;
+
+  //randomly select a possible direction
+
+  player_move(i,dir[rand8()%j]);
+
+  //if there was more than one possible direction,
+  //i.e. it is a branch and not a corridor,
+  //attempt to move towards the player
+
+  if(j>1)
+  {
+    if(ptr!=DIR_DOWN &&player_y[0]<player_y[i]) player_move(i,DIR_UP);
+    if(ptr!=DIR_UP   &&player_y[0]>player_y[i]) player_move(i,DIR_DOWN);
+    if(ptr!=DIR_RIGHT&&player_x[0]<player_x[i]) player_move(i,DIR_LEFT);
+    if(ptr!=DIR_LEFT &&player_x[0]>player_x[i]) player_move(i,DIR_RIGHT);
+  }
+}
+
 //the main gameplay code
 
-void game_loop(void)
-{
-  oam_clear();
+void setup_level(void) {
+  byte i;
+  
+  i = game_level<<1;
 
-  i=game_level<<1;
+  oam_clear();
 
   vram_adr(NAMETABLE_A);
   vram_unrle(levelList[i]);					//unpack level nametable
@@ -828,6 +900,14 @@ void game_loop(void)
   bright=0;
   frame_cnt=0;
 
+}
+
+void game_loop(void)
+{
+  unsigned char i;
+  
+  setup_level();
+  
   while(!game_done)
   {
     //construct OAM from object parameters
@@ -920,10 +1000,7 @@ void game_loop(void)
 
       if(i)
       {
-        if(!((player_x[i]+(4 <<FP_BITS))>=(player_x[0]+(12<<FP_BITS))||
-             (player_x[i]+(12<<FP_BITS))< (player_x[0]+(4 <<FP_BITS))||
-             (player_y[i]+(4 <<FP_BITS))>=(player_y[0]+(12<<FP_BITS))||
-             (player_y[i]+(12<<FP_BITS))< (player_y[0]+(4 <<FP_BITS))))
+        if(enemy_collides_with_player(i))
         {
           //if an enemy touch the player, quit the game loop
 
@@ -944,60 +1021,11 @@ void game_loop(void)
       {
         if(!i) //this is the player, process controls
         {
-          //get gamepad state, it was previously polled with pad_trigger
-
-          j=pad_state(0);
-
-          //this is a tricky part to make controls more predictable
-          //when you press two directions at once, sliding by a wall
-          //to take turn into a passage on the side
-          //this piece of code gives current direction lower priority
-          //through testing it first
-          //bits in player_dir var are matching to the buttons bits
-
-          if(j&player_dir[0])
-          {
-            j&=~player_dir[0]; //remove the direction from further check
-            player_move(i,player_dir[0]); //change the direction
-          }
-
-          //now continue control processing as usual
-
-          if(j&PAD_LEFT)  player_move(i,DIR_LEFT);
-          if(j&PAD_RIGHT) player_move(i,DIR_RIGHT);
-          if(j&PAD_UP)    player_move(i,DIR_UP);
-          if(j&PAD_DOWN)  player_move(i,DIR_DOWN);
+          process_player_controls(i);
         }
         else //this is an enemy, run AI
         {
-          //the AI is very simple
-          //first we create list of all directions that are possible to take
-          //excluding the direction that is opposite to previous one
-
-          i16=MAP_ADR((player_x[i]>>8),(player_y[i]>>8));
-          ptr=player_dir[i];
-          j=0;
-
-          if(ptr!=DIR_RIGHT&&map[i16-1]!=TILE_WALL) dir[j++]=DIR_LEFT;
-          if(ptr!=DIR_LEFT &&map[i16+1]!=TILE_WALL) dir[j++]=DIR_RIGHT;
-          if(ptr!=DIR_DOWN &&map[i16-MAP_WDT]!=TILE_WALL) dir[j++]=DIR_UP;
-          if(ptr!=DIR_UP   &&map[i16+MAP_WDT]!=TILE_WALL) dir[j++]=DIR_DOWN;
-
-          //randomly select a possible direction
-
-          player_move(i,dir[rand8()%j]);
-
-          //if there was more than one possible direction,
-          //i.e. it is a branch and not a corridor,
-          //attempt to move towards the player
-
-          if(j>1)
-          {
-            if(ptr!=DIR_DOWN &&player_y[0]<player_y[i]) player_move(i,DIR_UP);
-            if(ptr!=DIR_UP   &&player_y[0]>player_y[i]) player_move(i,DIR_DOWN);
-            if(ptr!=DIR_RIGHT&&player_x[0]<player_x[i]) player_move(i,DIR_LEFT);
-            if(ptr!=DIR_LEFT &&player_x[0]>player_x[i]) player_move(i,DIR_RIGHT);
-          }
+          process_enemy(i);
         }
       }
     }
