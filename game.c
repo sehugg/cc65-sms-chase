@@ -158,7 +158,7 @@ void pal_spr(const char *data) {
   }
 }
 
-void expand_nesbitmap(const char* src, byte ntiles, byte p) {
+void expand_nesbitmap(const char* src, int ntiles, byte p) {
   byte i;
   while (ntiles--) {
     for (i=0; i<8; i++) {
@@ -184,9 +184,13 @@ void setup_graphics() {
   cv_set_character_pattern_t(PATTERN);
   cv_set_image_table(IMAGE);
   cv_set_sprite_attribute_table(SPRITES);
-  cv_set_write_vram_address(PATTERN);
-  expand_nesbitmap(TILESET, 255, 0x21);
   cv_set_vint_handler(vblank_handler);
+  // convert NES bitmap to SMS format
+  cv_set_write_vram_address(PATTERN);
+  expand_nesbitmap(TILESET, 256, 0x21);
+  // different palette for player character
+  cv_set_write_vram_address(PATTERN + 0x51*32);
+  expand_nesbitmap(TILESET+0x49*16, 8, 0x61);
 }
 
 //game uses 12:4 fixed point calculations for enemy movements
@@ -297,26 +301,26 @@ const unsigned char sprPlayer[]={
 };
 
 const unsigned char sprEnemy1[]={
-	0,-1,0x4d,1,
-	8,-1,0x4e,1,
-	0, 7,0x4f,1,
-	8, 7,0x50,1,
+	0,-1,0x4d+8,1,
+	8,-1,0x4e+8,1,
+	0, 7,0x4f+8,1,
+	8, 7,0x50+8,1,
 	128
 };
 
 const unsigned char sprEnemy2[]={
-	0,-1,0x4d,2,
-	8,-1,0x4e,2,
-	0, 7,0x4f,2,
-	8, 7,0x50,2,
+	0,-1,0x4d+8,2,
+	8,-1,0x4e+8,2,
+	0, 7,0x4f+8,2,
+	8, 7,0x50+8,2,
 	128
 };
 
 const unsigned char sprEnemy3[]={
-	0,-1,0x4d,3,
-	8,-1,0x4e,3,
-	0, 7,0x4f,3,
-	8, 7,0x50,3,
+	0,-1,0x4d+8,3,
+	8,-1,0x4e+8,3,
+	0, 7,0x4f+8,3,
+	8, 7,0x50+8,3,
 	128
 };
 
