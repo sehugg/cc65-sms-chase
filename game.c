@@ -36,7 +36,7 @@ extern const unsigned char TILESET[8192];
 #define NTADR(x,y) ((y)*BYTES_PER_ROW + (x)*BYTES_PER_CELL + IMAGE)
 #define vram_adr(a) cv_set_write_vram_address(a)
 #define ppu_wait_frame() wait_vsync()
-#define scroll(x,y)
+#define scroll(x,y) //cv_set_hscroll(x); cv_set_vscroll(y);
 #define music_play(i)
 #define music_stop()
 #define music_pause(b)
@@ -121,12 +121,15 @@ void set_vram_update(unsigned char *buf) {
   update_ptr = buf;
 }
 void flush_vram_update() {
+  byte hi,lo,data;
   unsigned char* buf = update_ptr;
   if (!buf) return;
-  while (*buf != NT_UPD_EOF) {
-    byte hi = *buf++;
-    byte lo = *buf++;
-    byte data = *buf++;
+  // TODO: bug in compiler?
+  while (1) { // (*buf != NT_UPD_EOF) {
+    hi = *buf++;
+    if (hi == NT_UPD_EOF) break;
+    lo = *buf++;
+    data = *buf++;
     vram_adr(lo + hi*256);
     vram_put(data);
   }
@@ -178,8 +181,8 @@ void vblank_handler(void) {
 
 void setup_graphics() {
   cv_set_screen_mode(CV_SCREENMODE_4);
-  cv_set_character_pattern_t(PATTERN | 0x3000);
-  cv_set_image_table(IMAGE | 0x400);
+  cv_set_character_pattern_t(PATTERN);
+  cv_set_image_table(IMAGE);
   cv_set_sprite_attribute_table(SPRITES);
   cv_set_write_vram_address(PATTERN);
   expand_nesbitmap(TILESET, 255, 0x21);
@@ -280,7 +283,7 @@ const unsigned char palGame5[16]={ 0x0f,0x11,0x32,0x30,0x0f,0x16,0x26,0x36,0x0f,
 const unsigned char palGameSpr[16]={ 0x0f,0x0f,0x29,0x30,0x0f,0x0f,0x26,0x30,0x0f,0x0f,0x24,0x30,0x0f,0x0f,0x21,0x30 };
 
 /*{pal:"nes",layout:"nes"}*/
-const unsigned char palTitle[16]={ 0x0f,0x0f,0x0f,0x0f,0x0f,0x1c,0x2c,0x3c,0x0f,0x12,0x22,0x32,0x0f,0x14,0x24,0x34 };
+const unsigned char palTitle[16]={ 0x0F,0x11,0x21,0x31,0x0F,0x1C,0x2C,0x3C,0x0F,0x12,0x22,0x32,0x0F,0x14,0x24,0x34 };
 
 
 //metasprites
@@ -342,9 +345,9 @@ const unsigned char updateListData[]={
 0x28,0x00,TILE_EMPTY,	//the level tile after an item is collected
 0x28,0x00,TILE_EMPTY,
 0x28,0x00,TILE_EMPTY,
-0x20,0x4f,0x10,			//these three entires are used to display
-0x20,0x50,0x10,			//number of the collected items
-0x20,0x51,0x10,
+(IMAGE>>8),0x4f*2,0x10,	//these three entires are used to display
+(IMAGE>>8),0x50*2,0x10,	//number of the collected items
+(IMAGE>>8),0x51*2,0x10,
 NT_UPD_EOF
 };
 
@@ -484,9 +487,6 @@ void title_screen(void)
   //vram_fill(0,1024);
 
   pal_bg(palTitle);
-  pal_col(1,0x22); // added for SMS
-  pal_col(2,0x20); // added for SMS
-  pal_col(3,0x32); // added for SMS
   pal_bright(4);
   ppu_on_bg();
   delay(20);//delay just to make it look better
@@ -755,7 +755,7 @@ void move_player(char i) {
 
           i16 = NTADR(
             ((player_x[i]>>(TILE_SIZE_BIT+FP_BITS))<<1),
-            ((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))<<1)-4
+            ((player_y[i]>>(TILE_SIZE_BIT+FP_BITS))<<1)
            );
 
           //replace it with empty tile through the update list
