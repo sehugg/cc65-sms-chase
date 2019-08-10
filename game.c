@@ -31,6 +31,9 @@ extern const unsigned char TILESET[8192];
 
 #define NAMETABLE_A IMAGE
 #define NAMETABLE_C IMAGE
+#define BYTES_PER_ROW 64
+#define BYTES_PER_CELL 2
+#define NTADR(x,y) ((y)*BYTES_PER_ROW + (x)*BYTES_PER_CELL + IMAGE)
 #define vram_adr(a) cv_set_write_vram_address(a)
 #define ppu_wait_frame() wait_vsync()
 #define scroll(x,y)
@@ -61,13 +64,15 @@ void vram_put(unsigned char n) {
   cv_voutb(n);
   cv_voutb(0); // TODO
 }
+void vram_write(const unsigned char *src, unsigned int size) {
+  while (size--) {
+    vram_put(*src++);
+  }
+}
 void vram_fill(byte ch, word len) {
   while (len--) {
     vram_put(ch);
   }
-}
-void vram_read(unsigned char *dst, unsigned int size) {
-  dst; size;
 }
 void vram_unrle(const byte* rle) {
   byte tag = *rle++;
@@ -107,13 +112,18 @@ void pal_col(unsigned char index, unsigned char color) {
 }
 void oam_clear(void) {
 }
-void vram_write(const unsigned char *src, unsigned int size) {
-  src; size;
-}
 unsigned char oam_meta_spr(unsigned char x, unsigned char y,
                            unsigned char sprid, 
-                           const unsigned char *data) {
-  x;y;sprid;data; ///TODO
+                           const signed char *data) {
+  struct cvu_sprite4 spr;
+  while (*data != -128) {
+    spr.x = x + *data++;
+    spr.y = y + *data++;
+    spr.name = *data++;
+    *data++; // skip attr?
+    cvu_set_sprite4(SPRITES, sprid++, &spr);
+  }
+  return sprid;
 }
 
 /*{pal:222,n:64}*/
@@ -374,7 +384,7 @@ static unsigned char dir[4];
 
 //this array is used to convert nametable into game map, row by row
 
-static unsigned char nameRow[32];
+static unsigned char nameRow[BYTES_PER_ROW];
 
 //number of moving characters on current level
 
@@ -521,7 +531,7 @@ void show_screen(unsigned char num)
   if(!spr)//if it is the level screen, print large number
   {
     j=num<<1;
-    i16=0x2194;//position of the number in the nametable
+    i16=NTADR(20,12);//position of the number in the nametable
 
     for(i=0;i<3;++i)
     {
@@ -529,7 +539,7 @@ void show_screen(unsigned char num)
       vram_put(largeNums[j]);
       vram_put(largeNums[j+1]);
       j+=10;
-      i16+=32;
+      i16+=BYTES_PER_ROW;
     }
   }
 
@@ -608,19 +618,18 @@ void rewrite_level_vram() {
   //constructs game map, removes spawn points from the nametable,
   //and writes back to the VRAM
 
-  i16=NAMETABLE_A+0x0080;
+  i16=NTADR(0,4);
   ptr=0;
   wait=0;
 
   for(i=2;i<MAP_HGT+2;++i)
   {
-    vram_adr(i16);
-    vram_read(nameRow,32);
+    cvu_vmemtomemcpy(nameRow, i16, sizeof(nameRow));
     vram_adr(i16);
 
     for(j=0;j<MAP_WDT<<1;j+=2)
     {
-      spr=nameRow[j];
+      spr=nameRow[j*2];
 
       switch(spr)
       {
@@ -647,10 +656,10 @@ void rewrite_level_vram() {
       map[ptr++]=spr;
 
       vram_put(spr);
-      vram_put(nameRow[j+1]);
+      vram_put(nameRow[j*2+2]);
     }
 
-    i16+=64;
+    i16+=BYTES_PER_ROW*2;
   }
 
 }
